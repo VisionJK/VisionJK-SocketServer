@@ -14,7 +14,9 @@ int main( int argc, char *argv[] )
 	//{
 		for ( ;; )
 		{
+			onexit( Z_SendDisconnect );
 			Z_ServerLoop();
+			Z_CheckHeartBeat();
 		}
 	//}
 }

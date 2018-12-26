@@ -34,6 +34,7 @@ void Z_ServerLoop( void ) {
 
 		//UDP_send( &visionNetwork.socket, "Empfangen", 10, inet_ntoa( visionNetwork.remote.sin_addr ), ntohs( visionNetwork.remote.sin_port ) );
 
+		
 		Z_RunPacketCmd( &buffer, &visionNetwork.remote );
 	}
 	else
@@ -66,14 +67,45 @@ void Z_StartServer_f( void ) {
 	printf( "Warte auf Daten am Port (UDP) %u\n", PORT );
 }
 
-static void PF_Quit_f( char *in, struct sockaddr_in *info ) {
-	//Client aus dem Index löschen
-
-	char *ptr = in;
-
+void Z_CheckHeartBeat( void ) 
+{
 	for ( int i = 0; i < CLIENTS; i++ )
 	{
-		if ( !memcmp( &visionNetwork.remote, &visionNetwork.clients[i].con_info, sizeof( struct sockaddr_in ) ) )
+		if ( ( visionNetwork.clients[i].l_heartbeat + HEARTBEAT < runTime() && visionNetwork.clients[i].state > S_NONE ) && visionNetwork.clients->h_req == 0 )
+		{
+			char buf[BUF] = { 0 };
+			int len;
+
+			if ( len = snprintf( &buf, BUF, "hb %d", runTime() ) > 0 )
+			{
+				UDP_send( &visionNetwork.socket, buf, strlen( buf ) + 1, inet_ntoa( visionNetwork.clients[i].con_info.sin_addr ), ntohs( visionNetwork.clients[i].con_info.sin_port ) );
+				visionNetwork.clients->h_req = 1;
+			}
+		}
+
+		if ( (visionNetwork.clients[i].l_heartbeat + HEARTBEAT_KICK < runTime() && visionNetwork.clients[i].state > S_NONE) && visionNetwork.clients->h_req == 1 )
+		{
+			UDP_send( &visionNetwork.socket, "disconnect", 11, inet_ntoa( visionNetwork.clients[i].con_info.sin_addr ), ntohs( visionNetwork.clients[i].con_info.sin_port ) );
+			memset( &visionNetwork.clients[i], 0, sizeof( visionNetwork.clients[i] ) );
+			visionNetwork.clients[i].l_heartbeat = -1;
+		}
+	}
+}
+
+void Z_SendDisconnect( void ) {
+	for ( int i = 0; i < CLIENTS; i++ )
+	{
+		if( visionNetwork.clients[i].state > S_NONE )
+			UDP_send( &visionNetwork.socket, "disconnect", 11, inet_ntoa( visionNetwork.clients[i].con_info.sin_addr ), ntohs( visionNetwork.clients[i].con_info.sin_port ) );
+	}
+}
+
+
+static void PF_Quit_f( char *in, struct sockaddr_in *info ) {
+	//Client aus dem Index löschen
+	for ( int i = 0; i < CLIENTS; i++ )
+	{
+		if ( !memcmp( &visionNetwork.remote, &visionNetwork.clients[i].con_info, sizeof( struct sockaddr_in ) ) && visionNetwork.clients[i].state == S_CONNECT )
 		{
 			UDP_send( &visionNetwork.socket, "disconnect", 11, inet_ntoa( visionNetwork.clients[i].con_info.sin_addr ), ntohs( visionNetwork.clients[i].con_info.sin_port ) );
 			memset( &visionNetwork.clients[i], 0, sizeof( visionNetwork.clients[i] ) );
@@ -118,7 +150,7 @@ static void PF_Auth_f( char *in, struct sockaddr_in *info ) {
 	{
 		if (!memcmp(&visionNetwork.remote, &visionNetwork.clients[i].con_info, sizeof(struct sockaddr_in)))
 		{
-			if (!strncmp(in, ACCESS_KEY, strlen(in)))//dummy
+			if (!strncmp(in, "lol", 3))//dummy
 			{
 				UDP_send(&visionNetwork.socket, "auth", 5, inet_ntoa(visionNetwork.clients[i].con_info.sin_addr), ntohs(visionNetwork.clients[i].con_info.sin_port));
 				visionNetwork.clients[i].l_heartbeat = runTime();
@@ -145,7 +177,7 @@ static void PF_Chat_f( char *in, struct sockaddr_in *info ) {
 			if ( len = snprintf( &buf, BUF, "chat %s", in ) > 0 )
 			{
 				for ( int j = 0; j < CLIENTS && visionNetwork.clients[j].state == S_AUTH; j++ )
-					UDP_send( &visionNetwork.socket, &buf, strlen( buf ) + 1, inet_ntoa( visionNetwork.clients[j].con_info.sin_addr ), ntohs( visionNetwork.clients[j].con_info.sin_port ) );
+					UDP_send( &visionNetwork.socket, buf, strlen( buf ) + 1, inet_ntoa( visionNetwork.clients[j].con_info.sin_addr ), ntohs( visionNetwork.clients[j].con_info.sin_port ) );
 				visionNetwork.clients[i].l_heartbeat = runTime();
 			}		
 		}
@@ -156,16 +188,10 @@ static void PF_Heartbeat_f( char *in, struct sockaddr_in *info ) {
 	//Lebst du noch oder bist du schon tot?
 	for ( int i = 0; i < CLIENTS; i++ )
 	{
-		if ( !memcmp( &visionNetwork.remote, &visionNetwork.clients[i].con_info, sizeof( struct sockaddr_in ) ) && visionNetwork.clients[i].state == S_AUTH )
+		if ( !memcmp( &visionNetwork.remote, &visionNetwork.clients[i].con_info, sizeof( struct sockaddr_in ) ) && visionNetwork.clients[i].state > S_NONE )
 		{
-			char buf[BUF] = { 0 };
-			int len;
-
-			if ( len = snprintf( &buf, BUF, "hb %d", runTime() ) > 0 )
-			{
-				UDP_send( &visionNetwork.socket, buf, strlen(buf) + 1, inet_ntoa( visionNetwork.clients[i].con_info.sin_addr ), ntohs( visionNetwork.clients[i].con_info.sin_port ) );
-				visionNetwork.clients[i].l_heartbeat = runTime();
-			}
+			visionNetwork.clients[i].l_heartbeat = runTime();
+			visionNetwork.clients[i].h_req = 0;
 		}
 	}
 }
@@ -178,16 +204,15 @@ static void PF_GameState_f( char *in, struct sockaddr_in *info ) {
 typedef struct packetfunc_s {
 	char	*name;
 	void	( *func )(char* data, struct sockaddr_in *info);
-	boolean	needAuth;
 } packetfunc_t;
 
 static packetfunc_t packetfuncs[] = {
-	{ "auth",		PF_Auth_f, 0 },		// Authentifikation (Passwort Abfrage)
-	{ "connection", PF_Connection_f, 0 },	// Client verbindet sich
-	{ "chat",		PF_Chat_f, 1 },		// Chat Nachricht
-	{ "gs",			PF_GameState_f, 1 },	// Gamestate
-	{ "heartbeat",	PF_Heartbeat_f, 1 },	// Überprüfen ob noch aktiv
-	{ "quit",		PF_Quit_f, 1 },		// Client hat das Spiel geschlossen
+	{ "auth",		PF_Auth_f },		// Authentifikation (Passwort Abfrage)
+	{ "connection", PF_Connection_f },	// Client verbindet sich
+	{ "chat",		PF_Chat_f },		// Chat Nachricht
+	{ "gs",			PF_GameState_f },	// Gamestate
+	{ "heartbeat",	PF_Heartbeat_f },	// Überprüfen ob noch aktiv
+	{ "quit",		PF_Quit_f },		// Client hat das Spiel geschlossen
 
 };
 
