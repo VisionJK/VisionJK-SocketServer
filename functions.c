@@ -85,6 +85,7 @@ void Z_CheckHeartBeat( void )
 
 		if ( (visionNetwork.clients[i].l_heartbeat + HEARTBEAT_KICK < runTime() && visionNetwork.clients[i].state > S_NONE) && visionNetwork.clients->h_req == 1 )
 		{
+			printf( "Entferne %s:%d[%d] aus dem Index (Kein Heartbeat)\n", inet_ntoa( visionNetwork.clients[i].con_info.sin_addr ), ntohs( visionNetwork.clients[i].con_info.sin_port, i ) );
 			UDP_send( &visionNetwork.socket, "disconnect", 11, inet_ntoa( visionNetwork.clients[i].con_info.sin_addr ), ntohs( visionNetwork.clients[i].con_info.sin_port ) );
 			memset( &visionNetwork.clients[i], 0, sizeof( visionNetwork.clients[i] ) );
 			visionNetwork.clients[i].l_heartbeat = -1;

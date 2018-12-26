@@ -6,7 +6,7 @@
 #include <Windows.h>
 #endif // WIN32
 
-#define PORT 29075
+#define PORT 29000
 #define BUF 4096
 #define WS ' '
 #define CLIENTS 8
