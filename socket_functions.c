@@ -77,3 +77,96 @@ void UDP_recv( SOCKET *sock, char *data, size_t size ) {
 		return;
 	}
 }
+
+void H_Ready_Packet( visionpacket_t *packet, byte *buffer, int readSize ) {
+	packet->data = (byte *)buffer;
+	packet->currsize = 0;
+	packet->maxsize = readSize == NULL ? BUF : readSize;
+	packet->read = 0;
+}
+
+void H_Write_Packet( visionpacket_t *packet, long long data, int datatype ) {
+
+	switch ( datatype )
+	{
+	case V_CHAR:
+		packet->data[packet->currsize] = (byte)data;
+		packet->currsize += 1;
+		break;
+	case V_SHORT:
+		packet->data[packet->currsize] = data & 0xFF;
+		packet->data[packet->currsize + 1] = (data >> 8) & 0xFF;
+		packet->currsize += 2;
+		break;
+	case V_INTEGER32:
+		packet->data[packet->currsize] = data & 0xFF;
+		packet->data[packet->currsize + 1] = (data >> 8) & 0xFF;
+		packet->data[packet->currsize + 2] = (data >> 16) & 0xFF;
+		packet->data[packet->currsize + 3] = (data >> 24) & 0xFF;
+		packet->currsize += 4;
+		break;
+	case V_INTEGER64:
+		packet->data[packet->currsize] = data & 0xFF;
+		packet->data[packet->currsize + 1] = (data >> 8) & 0xFF;
+		packet->data[packet->currsize + 2] = (data >> 16) & 0xFF;
+		packet->data[packet->currsize + 3] = (data >> 24) & 0xFF;
+		packet->data[packet->currsize + 4] = (data >> 32) & 0xFF;
+		packet->data[packet->currsize + 5] = (data >> 40) & 0xFF;
+		packet->data[packet->currsize + 6] = (data >> 48) & 0xFF;
+		packet->data[packet->currsize + 7] = (data >> 56) & 0xFF;
+		packet->currsize += 8;
+		break;
+	default:
+		break;
+	}
+
+}
+
+unsigned long long H_Read_Packet( visionpacket_t *packet, int datatype )
+{
+	switch ( datatype )
+	{
+	case V_CHAR:
+	{
+		byte c_byte = packet->data[packet->read];
+		packet->read += 1;
+		return (byte)c_byte;
+	}
+	case V_SHORT:
+	{
+		unsigned short i_short;
+
+		i_short = packet->data[packet->read] | packet->data[packet->read + 1] << 8;
+		packet->read += 2;
+		return (unsigned short)i_short;
+	}
+	case V_INTEGER32:
+	{
+		unsigned int i_32;
+
+		i_32 = packet->data[packet->read];
+		i_32 |= packet->data[packet->read + 1] << 8;
+		i_32 |= packet->data[packet->read + 2] << 16;
+		i_32 |= packet->data[packet->read + 3] << 24;
+		packet->read += 4;
+		return (unsigned int)i_32;
+	}
+	case V_INTEGER64:
+	{
+		unsigned long long i_64;
+
+		i_64 = packet->data[packet->read];
+		i_64 |= (long long)packet->data[packet->read + 1] << 8;
+		i_64 |= (long long)packet->data[packet->read + 2] << 16;
+		i_64 |= (long long)packet->data[packet->read + 3] << 24;
+		i_64 |= (long long)packet->data[packet->read + 4] << 32;
+		i_64 |= (long long)packet->data[packet->read + 5] << 40;
+		i_64 |= (long long)packet->data[packet->read + 6] << 48;
+		i_64 |= (long long)packet->data[packet->read + 7] << 56;
+		packet->read += 8;
+		return (unsigned long long)i_64;
+	}
+	default:
+		return -1;
+	}
+}
