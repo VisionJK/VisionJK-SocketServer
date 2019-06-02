@@ -82,7 +82,7 @@ static void PF_Chat_f( char *in, struct sockaddr_in *info ) {
 			char buf[BUF] = { 0 };
 			int len;
 
-			if ( len = snprintf( &buf, BUF, "chat %s %s", visionNetwork.clients[i].uinfo.name, in ) > 0 )
+			if ( len = snprintf( &buf, BUF, "chat %s: %s", visionNetwork.clients[i].uinfo.name, in ) > 0 )
 			{
 				for ( int j = 0; j < CLIENTS && visionNetwork.clients[j].state == S_AUTH; j++ )
 					UDP_send( &visionNetwork.socket, buf, strlen( buf ) + 1, inet_ntoa( visionNetwork.clients[j].con_info.sin_addr ), ntohs( visionNetwork.clients[j].con_info.sin_port ) );
@@ -159,7 +159,7 @@ static void PF_newInfo_f( char *in, struct sockaddr_in *info ) {
 		{
 			visionpacket_t packet;
 
-			H_Ready_Packet( &packet, in, NULL );
+			H_Init_Packet( &packet, in, NULL );
 
 			visionNetwork.clients[i].uinfo.player.playerID = H_Read_Packet( &packet, V_SHORT );
 			visionNetwork.clients[i].uinfo.player.hat = H_Read_Packet( &packet, V_SHORT );
@@ -224,13 +224,13 @@ static void PF_GameState_f( char *in, struct sockaddr_in *info ) {
 
 			visionpacket_t packet;
 
-			H_Ready_Packet( &packet, in, NULL );
+			H_Init_Packet( &packet, in, NULL );
 
 			visionNetwork.clients[i].uinfo.player.health = H_Read_Packet( &packet, V_INTEGER32 );
 			visionNetwork.clients[i].uinfo.player.armor = H_Read_Packet( &packet, V_INTEGER32 );
 			visionNetwork.clients[i].uinfo.player.hat = H_Read_Packet( &packet, V_SHORT );
 
-			H_Ready_Packet( &packet, buf, NULL );
+			H_Init_Packet( &packet, buf, NULL );
 
 			H_Write_Packet( &packet, 'g', V_CHAR );
 			H_Write_Packet( &packet, 's', V_CHAR );

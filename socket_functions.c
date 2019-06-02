@@ -78,9 +78,10 @@ void UDP_recv( SOCKET *sock, char *data, size_t size ) {
 	}
 }
 
-void H_Ready_Packet( visionpacket_t *packet, byte *buffer, int readSize ) {
+void H_Init_Packet( visionpacket_t *packet, byte *buffer, int readSize ) {
 	packet->data = (byte *)buffer;
 	packet->currsize = 0;
+	packet->currbits = 0;
 	packet->maxsize = readSize == NULL ? BUF : readSize;
 	packet->read = 0;
 }

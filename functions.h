@@ -1,13 +1,15 @@
 #pragma once
 
 #include <stdio.h>
+#include <time.h>
+#include <math.h>
 
 #ifdef WIN32
 #include <Windows.h>
 #endif // WIN32
 
 #define PORT 29000
-#define BUF 4096
+#define BUF 1024
 #define WS ' '
 #define CLIENTS 8
 #define ACCESS_KEY "dummy"
@@ -43,11 +45,20 @@ typedef struct clients_s {
 	userinfo_t uinfo;
 } client_t;
 
+typedef struct visionpacket_s {
+	byte	*data;
+	int		currsize;
+	int		currbits;
+	int		maxsize;
+	int		read;
+}visionpacket_t;
+
 typedef struct visionNetwork_s {
 	SOCKET socket;
 	struct sockaddr_in remote;
-	
+	short remote_id;
 	client_t clients[CLIENTS];
+	visionpacket_t msg_packet;
 } visionNetwork_t;
 
 visionNetwork_t visionNetwork;
@@ -58,12 +69,10 @@ enum state {
 	S_AUTH,
 };
 
-typedef struct visionpacket_s {
-	byte	*data;
-	int		currsize;
-	int		maxsize;
-	int		read;
-}visionpacket_t;
+enum connection {
+	C_REFUSED,
+	C_ACCEPTED,
+};
 
 enum {
 	V_CHAR,
@@ -78,9 +87,14 @@ enum {
 	PRINT_UI,
 };
 
+enum send_e {
+	CLIENT_ALL = -1,
+};
+
 
 //server_functions.c
 void Z_ServerLoop( void );
+void Z_SendStates( void );
 void Z_CheckHeartBeat( void );
 void Z_StartServer_f( void );
 void Z_SendDisconnect( void );
@@ -95,8 +109,17 @@ void UDP_send( SOCKET * sock, char * data, size_t size, char * addr, unsigned sh
 void UDP_recv( SOCKET * sock, char * data, size_t size );
 
 //packet_functions.c
-void H_Ready_Packet( visionpacket_t *packet, byte *buffer, int readSize );
+void H_Init_Packet( visionpacket_t *packet, byte *buffer, int readSize );
 void H_Write_Packet( visionpacket_t *packet, long long data, int datatype );
 unsigned long long H_Read_Packet( visionpacket_t *packet, int datatype );
 void PF_RunPacketCmd( char *in, struct sockaddr_in *info );
 
+//globals
+
+#define FRAMERATE 60
+#define MSEC_FRAMERATE 1000/FRAMERATE
+
+client_t old_clients[CLIENTS];
+clock_t Sys_Clock();
+static clock_t sys_timeBase; //Startzeit programm
+clock_t sys_curtime, l_clock;
